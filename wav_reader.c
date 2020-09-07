@@ -14,11 +14,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #define HEAD_ID_LEN 4
 #define HEAD_SIZE_LEN 4
 #define MS_PMC_TAG 0x0001
 #define MAX_STR_LEN 256
+
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -64,6 +66,8 @@ int processDataSegment(int fd, riff_header *header, uint *dataLength);
 
 int main(int argc, char *argv[])
 {
+    char temp_buff[MAX_STR_LEN];
+
     // Open File
     int wavFd;
 
@@ -114,10 +118,12 @@ int main(int argc, char *argv[])
             printf("- Processing 'data'...\n");
             processDataSegment(wavFd, &tempHeader, &dataLength);
         } else {
-            printf("- Processing 'UNKNOWN'...\n");
+            strncpy(temp_buff, tempHeader.id, HEAD_ID_LEN);
+            temp_buff[HEAD_ID_LEN] = '\0';
+            printf("- Unknown segment '%s'...\n", temp_buff);
             // Unknow Processing
             // TODO: Move Segment Length Bytes to next one
-            break;
+            lseek(wavFd, tempHeader.size, SEEK_CUR);
         }
     }
     printf("Done Processing!\n");
@@ -138,6 +144,13 @@ int main(int argc, char *argv[])
     printf("\n");
     printf("- Data Byte Length: %u\n", dataLength);
     printf("- Duration: %us\n", calcSeconds);
+
+    // Stat Information
+    struct stat fileStat;
+    fstat(wavFd, &fileStat);
+    printf("Number of links to file '%s': %lu\n", argv[1], fileStat.st_nlink);
+    printf("File size: %lu\n", fileStat.st_size);
+
 
     // Close File
     close(wavFd);
@@ -211,6 +224,7 @@ int processLISTSegment(int fd, riff_header *header, riff_list_info *riffListInfo
 int processDataSegment(int fd, riff_header *header, uint *dataLength)
 {
     *dataLength = header->size;
-    lseek(fd, 0, SEEK_END);
+    //lseek(fd, 0, SEEK_END);
+    lseek(fd, *dataLength, SEEK_CUR);
     return 0;
 }
